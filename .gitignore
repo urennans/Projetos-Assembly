@@ -1,5 +1,12 @@
-# Ignorar arquivos objeto e executáveis
+# Ignorar arquivos objeto (gerados pela montagem)
 *.o
-loop
-dezena
-loopcrescentee
+
+# Ignorar todos os executáveis (sem extensão)
+# Isso cobre arquivos como: dezena, loop, etc
+*
+
+# Mas ainda assim, incluir todos os arquivos .asm e .md
+!*.asm
+!*.md
+!*.sh
+!.gitignore
