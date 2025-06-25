@@ -12,5 +12,7 @@ projetos-assembly/
 
 Use o `nasm` e o `ld` para compilar os arquivos:
 nasm -f elf32 loops/loop.asm -o loop.o
+
 ld -m elf_i386 loop.o -o loop
+
 ./loop
