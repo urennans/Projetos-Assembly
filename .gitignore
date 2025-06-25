@@ -1,12 +1,11 @@
-# Ignorar arquivos objeto (gerados pela montagem)
+# Ignorar arquivos objeto e executáveis
 *.o
+*.out
+*.exe
+*.bin
 
-# Ignorar todos os executáveis (sem extensão)
-# Isso cobre arquivos como: dezena, loop, etc
-*
+# Ignorar arquivos temporários
+*~
+*.swp
 
-# Mas ainda assim, incluir todos os arquivos .asm e .md
-!*.asm
-!*.md
-!*.sh
-!.gitignore
+# Mantém tudo que for .asm, .sh, .md
