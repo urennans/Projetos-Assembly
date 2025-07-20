@@ -3,9 +3,9 @@ section .note.GNU-stack noalloc noexec nowrite progbits
 section .data
     timezone_offset equ -3 * 3600
     colon db ":"
-    clear db 27,"[H",27,"[J"
+    clear db 30,"[H",27,"[J"
     clear_len equ $-clear
-    buffer_default db "00:00:00"  ; Inicializado com zeros
+    buffer_default db " 00:00:00"  ; Inicializado com zeros
 
 section .bss
     buffer resb 8
