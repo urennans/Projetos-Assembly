@@ -6,13 +6,12 @@ section .data
     
     ; Mensagens
     msg_det db "O determinante da matriz é: ", 0
-    newline db 10, 0
-    minus db "-", 0
+    msg_len equ $ - msg_det - 1  ; Calcula o tamanho da mensagem automaticamente
+    newline db 10
 
 section .bss
-    char resb 1
+    buffer resb 12      ; Buffer para conversão de números
     det resd 1
-    temp resd 1
 
 section .text
 global _start
@@ -22,54 +21,54 @@ _start:
     ; det = a(ei - fh) - b(di - fg) + c(dh - eg)
     
     ; Calcular a(ei - fh)
-    mov eax, [matriz + 16]    ; e
-    imul dword [matriz + 32]  ; *i
-    mov [temp], eax
+    mov eax, [matriz + 16]    ; e (linha 1, col 2)
+    imul dword [matriz + 32]  ; *i (linha 2, col 2)
+    mov ebx, eax
     
-    mov eax, [matriz + 20]    ; f
-    imul dword [matriz + 28]  ; *h
-    sub [temp], eax
+    mov eax, [matriz + 20]    ; f (linha 1, col 2)
+    imul dword [matriz + 28]  ; *h (linha 2, col 1)
+    sub ebx, eax              ; ebx = (ei - fh)
     
-    mov eax, [matriz + 0]     ; a
-    imul dword [temp]         ; * (ei - fh)
+    mov eax, [matriz]         ; a (linha 0, col 0)
+    imul ebx                  ; eax = a*(ei - fh)
     mov [det], eax
     
     ; Calcular -b(di - fg)
-    mov eax, [matriz + 12]    ; d
-    imul dword [matriz + 32]  ; *i
-    mov [temp], eax
+    mov eax, [matriz + 12]    ; d (linha 1, col 0)
+    imul dword [matriz + 32]  ; *i (linha 2, col 2)
+    mov ebx, eax
     
-    mov eax, [matriz + 20]    ; f
-    imul dword [matriz + 24]  ; *g
-    sub [temp], eax
+    mov eax, [matriz + 20]    ; f (linha 1, col 2)
+    imul dword [matriz + 24]  ; *g (linha 2, col 0)
+    sub ebx, eax              ; ebx = (di - fg)
     
-    mov eax, [matriz + 4]     ; b
-    imul dword [temp]         ; * (di - fg)
+    mov eax, [matriz + 4]     ; b (linha 0, col 1)
+    imul ebx                  ; eax = b*(di - fg)
     sub [det], eax            ; subtrai (por causa do -b)
     
     ; Calcular c(dh - eg)
-    mov eax, [matriz + 12]    ; d
-    imul dword [matriz + 28]  ; *h
-    mov [temp], eax
+    mov eax, [matriz + 12]    ; d (linha 1, col 0)
+    imul dword [matriz + 28]  ; *h (linha 2, col 1)
+    mov ebx, eax
     
-    mov eax, [matriz + 16]    ; e
-    imul dword [matriz + 24]  ; *g
-    sub [temp], eax
+    mov eax, [matriz + 16]    ; e (linha 1, col 1)
+    imul dword [matriz + 24]  ; *g (linha 2, col 0)
+    sub ebx, eax              ; ebx = (dh - eg)
     
-    mov eax, [matriz + 8]     ; c
-    imul dword [temp]         ; * (dh - eg)
+    mov eax, [matriz + 8]     ; c (linha 0, col 2)
+    imul ebx                  ; eax = c*(dh - eg)
     add [det], eax
     
     ; Imprimir a mensagem
     mov eax, 4                ; sys_write
     mov ebx, 1                ; stdout
     mov ecx, msg_det
-    mov edx, 26
+    mov edx, msg_len
     int 0x80
     
     ; Converter o determinante para string e imprimir
     mov eax, [det]
-    call print_int
+    call print_number
     
     ; Imprimir nova linha
     mov eax, 4
@@ -83,55 +82,49 @@ _start:
     xor ebx, ebx              ; status 0
     int 0x80
 
-; Função para imprimir um inteiro sinalizado
-print_int:
-    push eax
-    push ebx
-    push ecx
-    push edx
+; Função para imprimir um número inteiro (com sinal)
+print_number:
+    pusha
+    mov edi, buffer + 11      ; Aponta para o final do buffer
+    mov byte [edi], 0         ; Terminador nulo
+    mov ebx, 10               ; Divisor
     
-    ; Verificar se é negativo
+    ; Verifica se é negativo
     test eax, eax
     jns .positive
     neg eax
-    push eax
+    push eax                  ; Salva o valor positivo
     
-    ; Imprimir sinal negativo
+    ; Imprime o sinal negativo
     mov eax, 4
     mov ebx, 1
     mov ecx, minus
     mov edx, 1
     int 0x80
     
-    pop eax
+    pop eax                   ; Recupera o valor positivo
+    mov ebx, 10
     
 .positive:
-    ; Converter para string
-    mov ebx, 10
-    xor ecx, ecx
-    
-.convert_loop:
+    ; Converte dígitos
+    dec edi
     xor edx, edx
     div ebx
     add dl, '0'
-    push edx
-    inc ecx
+    mov [edi], dl
     test eax, eax
-    jnz .convert_loop
+    jnz .positive
     
-    ; Imprimir dígitos
-.print_loop:
-    pop eax
-    mov [char], al
+    ; Imprime o número
     mov eax, 4
     mov ebx, 1
-    mov ecx, char
-    mov edx, 1
+    mov ecx, edi
+    mov edx, buffer + 12
+    sub edx, edi
     int 0x80
-    loop .print_loop
     
-    pop edx
-    pop ecx
-    pop ebx
-    pop eax
+    popa
     ret
+
+section .data
+minus db "-", 0
