@@ -58,11 +58,10 @@ loop_k:
     lea edx, [matrizA + eax]
     mov eax, [edx + ecx*4]  ; EAX = A[i][k]
     
-    ; Calcular B[k][j]
-    mov ebx, ecx
-    mov edx, 12
-    mul edx
-    lea edx, [matrizB + eax]
+    ; Calcular B[k][j] - CORREÇÃO AQUI
+    mov ebx, ecx        ; k
+    imul ebx, 12        ; 3 elementos * 4 bytes
+    lea edx, [matrizB + ebx]
     mov ebx, [edx + edi*4]  ; EBX = B[k][j]
     
     ; Multiplicar e somar ao resultado
