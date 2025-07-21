@@ -1,251 +1,170 @@
 section .data
-    prompt db "Digite uma expressão matemática (+, -, *, /, ()): ", 0
+    prompt db "Digite uma expressao matematica (+, -, *, /): ", 0
     result db "Resultado: %d", 10, 0
-    input times 256 db 0       ; Buffer para entrada do usuário
-    error_msg db "Erro na expressão!", 10, 0
+    input times 256 db 0
+    error_msg db "Erro na expressao!", 10, 0
+
+section .bss
+    num1 resd 1
+    num2 resd 1
+    op resb 1
 
 section .text
     global main
-    extern printf, scanf, malloc, free
+    extern printf, scanf, fgets, stdin
 
 main:
-    ; Alocar espaço para a pilha de avaliação
-    mov rdi, 256
-    call malloc
-    mov r12, rax               ; r12 = ponteiro para a pilha
-    mov r13, rax               ; r13 = topo da pilha
-
+    push ebp
+    mov ebp, esp
+    
     ; Pedir entrada do usuário
-    mov rdi, prompt
-    xor rax, rax
+    push prompt
     call printf
+    add esp, 4
 
     ; Ler expressão do usuário
-    mov rdi, input
-    mov rsi, 255               ; Máximo de 255 caracteres
-    mov rdx, [rel stdin]
+    push dword [stdin]
+    push 255
+    push input
     call fgets
+    add esp, 12
 
-    ; Avaliar a expressão
-    mov rdi, input
-    mov rsi, r12
-    call evaluate_expression
+    ; Parsear a expressão
+    mov esi, input
+    
+    ; Pular espaços iniciais
+.skip_spaces1:
+    movzx eax, byte [esi]
+    cmp al, ' '
+    jne .get_num1
+    inc esi
+    jmp .skip_spaces1
 
-    ; Verificar se há resultado na pilha
-    cmp r13, r12
-    jne .valid_result
+.get_num1:
+    call parse_number
+    mov [num1], eax
+    
+    ; Pular espaços após o primeiro número
+.skip_spaces2:
+    movzx eax, byte [esi]
+    cmp al, ' '
+    jne .get_op
+    inc esi
+    jmp .skip_spaces2
 
-    ; Se não, erro
-    mov rdi, error_msg
-    xor rax, rax
+.get_op:
+    mov al, [esi]
+    mov [op], al
+    inc esi
+    
+    ; Pular espaços após o operador
+.skip_spaces3:
+    movzx eax, byte [esi]
+    cmp al, ' '
+    jne .get_num2
+    inc esi
+    jmp .skip_spaces3
+
+.get_num2:
+    call parse_number
+    mov [num2], eax
+
+    ; Verificar se chegou ao final da string
+    movzx eax, byte [esi]
+    cmp al, 0
+    je .calculate
+    cmp al, 10     ; newline
+    je .calculate
+    
+    jmp .error
+
+.calculate:
+    ; Realizar operação
+    mov eax, [num1]
+    mov ebx, [num2]
+    mov cl, [op]
+    
+    cmp cl, '+'
+    je .add
+    cmp cl, '-'
+    je .sub
+    cmp cl, '*'
+    je .mul
+    cmp cl, '/'
+    je .div
+    
+    jmp .error
+
+.add:
+    add eax, ebx
+    jmp .show_result
+
+.sub:
+    sub eax, ebx
+    jmp .show_result
+
+.mul:
+    imul eax, ebx
+    jmp .show_result
+
+.div:
+    xor edx, edx
+    idiv ebx
+    jmp .show_result
+
+.show_result:
+    push eax
+    push result
     call printf
+    add esp, 8
     jmp .exit
 
-.valid_result:
-    ; Imprimir resultado
-    mov rdi, result
-    mov esi, [r12]
-    xor rax, rax
+.error:
+    push error_msg
     call printf
+    add esp, 4
 
 .exit:
-    ; Liberar memória e sair
-    mov rdi, r12
-    call free
-    xor rax, rax
-    ret
-
-; Função para avaliar expressão
-; rdi = ponteiro para string
-; rsi = ponteiro para pilha
-evaluate_expression:
-    push rbp
-    mov rbp, rsp
-    push rbx
-    push r12
-    push r13
-
-    mov r12, rdi               ; r12 = string de entrada
-    mov r13, rsi               ; r13 = base da pilha
-    lea rbx, [rsi + 256]       ; rbx = topo da pilha
-
-    xor rcx, rcx               ; Contador de parênteses
-
-.eval_loop:
-    movzx eax, byte [r12]
-    test al, al
-    jz .eval_done
-
-    ; Ignorar espaços
-    cmp al, ' '
-    je .next_char
-
-    ; Verificar dígito
-    cmp al, '0'
-    jb .not_digit
-    cmp al, '9'
-    ja .not_digit
-
-    ; Processar número
-    call parse_number
-    push rax
-    jmp .next_char
-
-.not_digit:
-    ; Verificar operador ou parêntese
-    cmp al, '('
-    je .open_paren
-    cmp al, ')'
-    je .close_paren
-    cmp al, '+'
-    je .add_op
-    cmp al, '-'
-    je .sub_op
-    cmp al, '*'
-    je .mul_op
-    cmp al, '/'
-    je .div_op
-
-    ; Caractere inválido
-    jmp .eval_error
-
-.open_paren:
-    inc rcx
-    push '('
-    jmp .next_char
-
-.close_paren:
-    dec rcx
-    js .eval_error             ; Parêntese fechado sem aberto
-
-    ; Avaliar até encontrar '('
-.close_loop:
-    pop rdx
-    cmp dl, '('
-    je .next_char
-
-    pop rsi
-    pop rdi
-    call do_operation
-    push rax
-    jmp .close_loop
-
-.add_op:
-    push '+'
-    jmp .next_char
-
-.sub_op:
-    push '-'
-    jmp .next_char
-
-.mul_op:
-    push '*'
-    jmp .next_char
-
-.div_op:
-    push '/'
-    jmp .next_char
-
-.next_char:
-    inc r12
-    jmp .eval_loop
-
-.eval_done:
-    ; Verificar parênteses balanceados
-    test rcx, rcx
-    jnz .eval_error
-
-    ; Avaliar operações restantes
-.eval_remaining:
-    cmp rsp, rbp
-    je .eval_success
-
-    pop rdx
-    pop rsi
-    pop rdi
-    call do_operation
-    push rax
-    jmp .eval_remaining
-
-.eval_success:
-    pop rax                    ; Resultado final
-    mov [r13], eax             ; Armazenar na base da pilha
-    jmp .eval_exit
-
-.eval_error:
-    mov qword [r13], 0         ; Limpar resultado
-    mov rdi, error_msg
-    xor rax, rax
-    call printf
-
-.eval_exit:
-    pop r13
-    pop r12
-    pop rbx
-    mov rsp, rbp
-    pop rbp
+    mov esp, ebp
+    pop ebp
     ret
 
 ; Função para parsear número
-; r12 = ponteiro para string
-; Retorna número em rax
+; esi = ponteiro para string (atualizado durante a execução)
+; Retorna número em eax
 parse_number:
     xor eax, eax
     xor ecx, ecx
 
-.parse_loop:
-    movzx edx, byte [r12]
+.next_digit:
+    movzx edx, byte [esi]
+    test dl, dl
+    jz .done
+    cmp dl, 10     ; newline
+    je .done
+    cmp dl, ' '
+    je .done
+    cmp dl, '+'
+    je .done
+    cmp dl, '-'
+    je .done
+    cmp dl, '*'
+    je .done
+    cmp dl, '/'
+    je .done
+    
     sub edx, '0'
     cmp edx, 9
-    ja .parse_done
-
+    ja .invalid
+    
     imul eax, 10
     add eax, edx
-    inc r12
-    jmp .parse_loop
+    inc esi
+    jmp .next_digit
 
-.parse_done:
-    dec r12                   ; Ajustar ponteiro
+.invalid:
+    xor eax, eax
     ret
 
-; Função para executar operação
-; rdi = operando esquerdo
-; rsi = operando direito
-; dl = operador
-; Retorna resultado em rax
-do_operation:
-    cmp dl, '+'
-    je .do_add
-    cmp dl, '-'
-    je .do_sub
-    cmp dl, '*'
-    je .do_mul
-    cmp dl, '/'
-    je .do_div
-
-    xor eax, eax              ; Operador inválido
+.done:
     ret
-
-.do_add:
-    add edi, esi
-    mov eax, edi
-    ret
-
-.do_sub:
-    sub edi, esi
-    mov eax, edi
-    ret
-
-.do_mul:
-    imul edi, esi
-    mov eax, edi
-    ret
-
-.do_div:
-    xor edx, edx
-    mov eax, edi
-    idiv esi
-    ret
-
-section .bss
-    ; Nada adicional necessário
